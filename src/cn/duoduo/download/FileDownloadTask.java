@@ -34,7 +34,6 @@ public class FileDownloadTask implements Callable<Boolean> {
         // 验证是否已经下载
         if (hash != null)
             if (path.isFile() && FileUtils.verifyFile(path, hash)) {
-                log.info("跳过下载: {} => {} {}", url, path, hash);
                 return true;
             }
 

@@ -3,6 +3,7 @@ package cn.duoduo.download;
 import cn.duoduo.beans.Artifact;
 import cn.duoduo.beans.LaunchInfo;
 import cn.duoduo.beans.RequestBody;
+import cn.duoduo.utils.FileUtils;
 import com.google.gson.Gson;
 import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -61,6 +62,7 @@ public class Downloader {
 
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpPost request = new HttpPost(url);
+        request.setConfig(FileUtils.getRequestConfig());
         StringEntity params = new StringEntity(body);
         request.addHeader("content-type", "application/json");
         request.setEntity(params);
@@ -120,7 +122,7 @@ public class Downloader {
             try {
                 future.get();
             } catch (ExecutionException e) {
-                log.error("下载失败: ", e);
+                log.error("错误: ", e);
             }
         }
 

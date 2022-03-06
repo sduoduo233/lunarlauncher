@@ -1,10 +1,16 @@
 package cn.duoduo.utils;
 
+import cn.duoduo.download.FileDownloadTask;
 import jdk.internal.util.xml.impl.Input;
+import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpHost;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sun.misc.IOUtils;
 import sun.nio.ch.IOUtil;
 
@@ -17,6 +23,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class FileUtils {
+
+    private final static Logger log = LoggerFactory.getLogger(FileUtils.class);
 
     /**
      * 计算SHA1
@@ -47,7 +55,7 @@ public class FileUtils {
         }
     }
 
-    public static boolean verifyFile(File file, String sha1) throws IOException, NoSuchAlgorithmException {
+    public static boolean verifyFile(File file, String sha1) throws IOException {
         return calcSHA1(file).equalsIgnoreCase(sha1);
     }
 
@@ -65,7 +73,7 @@ public class FileUtils {
                 OutputStream out = new FileOutputStream(entryDestination);
 
                 byte[] bytes = new byte[1024];
-                int n = 0;
+                int n;
                 while ((n = in.read(bytes)) != -1) {
                     out.write(bytes, 0, n);
                 }
@@ -77,26 +85,49 @@ public class FileUtils {
         zipFile.close();
     }
 
-    public static void downloadFile(File path, String url) throws IOException {
-        // 下载
-        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-
-        HttpGet httpGet = new HttpGet(url);
-        CloseableHttpResponse response = httpClient.execute(httpGet);
-
-        if (response.getCode() != 200) {
-            throw new IOException(String.format("HTTP CODE: %s", response.getCode()));
+    public static RequestConfig getRequestConfig() {
+        String proxyHost = System.getProperty("http.proxyHost");
+        int proxyPort = 0;
+        try {
+            proxyPort = Integer.parseInt(System.getProperty("http.proxyPort"));
+        } catch (Exception ignored) {
         }
 
-        // 保存文件
-        path.getParentFile().mkdirs();
-        BufferedInputStream is = new BufferedInputStream(response.getEntity().getContent());
-        BufferedOutputStream os = new BufferedOutputStream(new FileOutputStream(path));
-        int inByte;
-        while ((inByte = is.read()) != -1) os.write(inByte);
-        is.close();
-        os.close();
-        httpClient.close();
+        HttpHost proxy = new HttpHost("http", proxyHost, proxyPort);
+        if (proxyHost != null)
+            return RequestConfig.custom()
+                    .setProxy(proxy)
+                    .build();
+        else
+            return RequestConfig.DEFAULT;
+    }
+
+    public static void downloadFile(File path, String url) throws IOException {
+        try {
+            // 下载
+            CloseableHttpClient httpClient = HttpClientBuilder.create().useSystemProperties().build();
+
+            HttpGet httpGet = new HttpGet(url);
+            httpGet.setConfig(FileUtils.getRequestConfig());
+            CloseableHttpResponse response = httpClient.execute(httpGet);
+
+            if (response.getCode() != 200) {
+                throw new IOException(String.format("HTTP CODE: %s %s", response.getCode(), url));
+            }
+
+            // 保存文件
+            path.getParentFile().mkdirs();
+            BufferedInputStream is = new BufferedInputStream(response.getEntity().getContent());
+            BufferedOutputStream os = new BufferedOutputStream(new FileOutputStream(path));
+            int inByte;
+            while ((inByte = is.read()) != -1) os.write(inByte);
+            is.close();
+            os.close();
+            httpClient.close();
+        } catch (IOException exception) {
+            log.error(String.format("下载失败: %s", url), exception);
+            throw exception;
+        }
     }
 
 }
